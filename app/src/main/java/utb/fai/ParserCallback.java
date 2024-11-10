@@ -3,6 +3,8 @@ package utb.fai;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Collectors;
 
 import javax.swing.text.MutableAttributeSet;
@@ -42,21 +44,21 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
      * (parsovali). Pokud najdeme na stránce URL, který je v této množině,
      * nebudeme jej u dále parsovat
      */
-    HashSet<URI> visitedURIs;
+    ConcurrentHashMap<URI, Boolean> visitedURIs;
 
     /**
      * foundURLs jsou všechna nová (zatím nenavštívená) URL, která na stránce
      * najdeme. Poté, co projdeme celou stránku, budeme z tohoto seznamu
      * jednotlivá URL brát a zpracovávat.
      */
-    LinkedList<URIinfo> foundURIs;
+    ConcurrentLinkedDeque<URIinfo> foundURIs;
 
     /** pokud debugLevel>1, budeme vypisovat debugovací hlášky na std. error */
     int debugLevel = 0;
     HashMap<String, Integer> wordsCount = new HashMap<>();
 
 
-    ParserCallback(HashSet<URI> visitedURIs, LinkedList<URIinfo> foundURIs,  HashMap<String, Integer> wordsCount, int maxDepth, int debugLevel) {
+    ParserCallback(ConcurrentHashMap<URI,Boolean> visitedURIs, ConcurrentLinkedDeque<URIinfo> foundURIs, HashMap<String, Integer> wordsCount, int maxDepth, int debugLevel) {
         this.foundURIs = foundURIs;
         this.visitedURIs = visitedURIs;
         this.debugLevel = debugLevel;
@@ -80,11 +82,11 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
                 try {
                     URI linkUri = new URI(href);
                     if (!visitedURIs.contains(linkUri)) {
-                        visitedURIs.add(linkUri);
+                        visitedURIs.put(linkUri, Boolean.TRUE);
                         foundURIs.add(new URIinfo(linkUri, depth + 1));
                     }
                 } catch (URISyntaxException e) {
-                    System.err.println("Invalid link URI: " + href);
+                    //System.err.println("Invalid link URI: " + href);
                 }
             }
         }
@@ -110,13 +112,13 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
             try {
                 uri = pageURI.resolve(href);
                 if (!uri.isOpaque() && !visitedURIs.contains(uri)) { //opaqeu - mail, tools...
-                    visitedURIs.add(uri);
+                    visitedURIs.put(uri, Boolean.TRUE);
                     foundURIs.add(new URIinfo(uri, depth + 1));
                     if (debugLevel > 0)
                         System.err.println("Adding URI: " + uri.toString());
                 }
             } catch (Exception e) {
-                System.err.println("Nalezeno nekorektní URI: " + href);
+                //System.err.println("Nalezeno nekorektní URI: " + href);
                 e.printStackTrace();
             }
 
@@ -135,7 +137,7 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
      * HTML stránkách.
      *******************************************************************/
     public void handleText(char[] data, int pos) {
-       //System.out.println("handleText: " + String.valueOf(data) + ", pos=" + pos);
+        //System.out.println("handleText: " + String.valueOf(data) + ", pos=" + pos);
         String text = String.valueOf(data);
         //System.out.println(text);
         String[] words = text.split("\\W+");
@@ -152,12 +154,14 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
          */
     }
     public void printWordsCount() {
+        // Seřadíme slova podle četnosti a vybereme top 20
         List<Map.Entry<String, Integer>> sorted = wordsCount.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .filter(entry -> entry.getKey().matches("[a-zA-Z]+")) // Filtrování pouze slov
                 .limit(20)
                 .collect(Collectors.toList());
-        for (Map.Entry<String, Integer> entry : sorted) {
-            System.out.println(entry.getKey() + ";" + entry.getValue());
-        }
+
+        // Vypíšeme slova s jejich četností
+        sorted.forEach(entry -> System.out.println(entry.getKey().toLowerCase() + ";" + entry.getValue()));
     }
 }

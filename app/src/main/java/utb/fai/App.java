@@ -9,8 +9,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -24,8 +23,8 @@ public class App {
 			System.err.println("Missing parameters - start URL, debug level, and max depth");
 			return;
 		}
-		LinkedList<URIinfo> foundURIs = new LinkedList<>();
-		HashSet<URI> visitedURIs = new HashSet<>();
+		ConcurrentLinkedDeque<URIinfo> foundURIs = new ConcurrentLinkedDeque<>();
+		ConcurrentHashMap<URI, Boolean> visitedURIs = new ConcurrentHashMap<>();
 		HashMap<String, Integer> wordsCount = new HashMap<>();
 		int debugLevel = Integer.parseInt(args[1]);
 		int maxDepth = Integer.parseInt(args[2]);
@@ -35,7 +34,7 @@ public class App {
 			//uri = new URI(args[0] + "/");
 			uri = new URI(args[0] + "/");
 			foundURIs.add(new URIinfo(uri, 0)); // množina nalezených URI
-			visitedURIs.add(uri); // všechny již navštívené URI, ignoruju pokud již byla navštívena
+			visitedURIs.put(uri, Boolean.TRUE); // všechny již navštívené URI, ignoruju pokud již byla navštívena
 			/**
 			 * Zde zpracujte dalí parametry - maxDepth a debugLevel
 			 */
@@ -48,30 +47,40 @@ public class App {
 
 				callBack.depth = URIinfo.depth; // kontroluje hloubku procházení
 				callBack.pageURI = uri = URIinfo.uri;
-				System.err.println("Analyzing " + uri);
+				//System.err.println("Analyzing " + uri);
 
 				URI finalUri = uri;
 				executor.submit(() -> {
 					try {
-						Document doc = Jsoup.connect(finalUri.toString()).timeout(10000).get(); // Increased timeout to 10 seconds
+						Document doc = Jsoup.connect(finalUri.toString()).get();
+						String charset = doc.charset().name();
+						//System.err.println("Page encoding: " + charset);// Increased timeout to 10 seconds
 						callBack.parseDocument(doc);
 					} catch (Exception e) {
-						System.err.println("Error loading page: " + e.getMessage());
+						//System.err.println("Error loading page: " + e.getMessage());
 					}
 				});
 			}
 
 			executor.shutdown();
-			while (!executor.isTerminated()) {
+			try {
+				if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+					//System.err.println("Timeout: Některá vlákna nebyla ukončena včas.");
+					executor.shutdownNow();
+				}
+			} catch (InterruptedException e) {
+				//System.err.println("Vlákno bylo přerušeno.");
+				executor.shutdownNow();
 			}
+
 
 			callBack.printWordsCount();
 
 		} catch (URISyntaxException e) {
-			System.err.println("Invalid URI: " + args[0]);
+			//System.err.println("Invalid URI: " + args[0]);
 		} catch (Exception e) {
-			System.err.println("Zachycena neoetøená výjimka, konèíme...");
-			e.printStackTrace();
+			//System.err.println("Zachycena neoetøená výjimka, konèíme...");
+			//e.printStackTrace();
 		}
 	}
 
