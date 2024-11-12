@@ -69,7 +69,10 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
     public void parseDocument(Document doc) {
         // Extract and count words from the document
         String text = doc.body().text();
-        String[] words = text.split("\\W+");
+        if(text.contains("-")){ //pokud obsahuje pomlčku, tak ji nahradíme mezerou
+            text = text.replace("-","-");
+        }
+        String[] words = text.split("\\s+");
         for (String word : words) {
             wordsCount.put(word, wordsCount.getOrDefault(word, 0) + 1);
         }
@@ -139,29 +142,26 @@ class ParserCallback extends HTMLEditorKit.ParserCallback {
     public void handleText(char[] data, int pos) {
         //System.out.println("handleText: " + String.valueOf(data) + ", pos=" + pos);
         String text = String.valueOf(data);
-        //System.out.println(text);
-        String[] words = text.split("\\W+");
+        String[] words = text.split("\\s+");
         for (String word : words) {
             if (!word.isEmpty()) {
-                word = word.toLowerCase();
                 wordsCount.put(word, wordsCount.getOrDefault(word, 0) + 1);
             }
         }
+    }
 
         //hahs mapa -> list -> sort -> print
         /**
          * ...tady bude vaše implementace...
          */
-    }
     public void printWordsCount() {
         // Seřadíme slova podle četnosti a vybereme top 20
         List<Map.Entry<String, Integer>> sorted = wordsCount.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                .filter(entry -> entry.getKey().matches("[a-zA-Z]+")) // Filtrování pouze slov
                 .limit(20)
-                .collect(Collectors.toList());
+                .toList();
 
         // Vypíšeme slova s jejich četností
-        sorted.forEach(entry -> System.out.println(entry.getKey().toLowerCase() + ";" + entry.getValue()));
+        sorted.forEach(entry -> System.out.println(entry.getKey() + ";" + entry.getValue()));
     }
 }

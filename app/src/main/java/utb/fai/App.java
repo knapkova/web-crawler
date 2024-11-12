@@ -26,8 +26,8 @@ public class App {
 		ConcurrentLinkedDeque<URIinfo> foundURIs = new ConcurrentLinkedDeque<>();
 		ConcurrentHashMap<URI, Boolean> visitedURIs = new ConcurrentHashMap<>();
 		HashMap<String, Integer> wordsCount = new HashMap<>();
-		int debugLevel = Integer.parseInt(args[1]);
-		int maxDepth = Integer.parseInt(args[2]);
+		int debugLevel = Integer.parseInt(args[2]);
+		int maxDepth = Integer.parseInt(args[1]);
 
 		URI uri;
 		try {
@@ -54,7 +54,7 @@ public class App {
 					try {
 						Document doc = Jsoup.connect(finalUri.toString()).get();
 						String charset = doc.charset().name();
-						//System.err.println("Page encoding: " + charset);// Increased timeout to 10 seconds
+						//System.err.println("Page encoding: " + charset);
 						callBack.parseDocument(doc);
 					} catch (Exception e) {
 						//System.err.println("Error loading page: " + e.getMessage());
